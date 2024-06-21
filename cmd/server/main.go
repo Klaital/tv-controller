@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/klaital/tv-controller/cmd/server/api"
 	"github.com/klaital/tv-controller/internal/config"
+	"github.com/klaital/tv-controller/vlcclient"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"log/slog"
@@ -27,7 +28,12 @@ func main() {
 	cfg := config.LoadConfig(db)
 	fmt.Printf("%+v\n", cfg)
 
-	srv := api.NewServer(db)
+	// Construct API client for controlling VLC
+	vlcClient := &vlcclient.Client{
+		Addr:         "http://localhost:8090",
+		HttpPassword: "bedroomtv123",
+	}
+	srv := api.NewServer(db, vlcClient)
 	r := http.NewServeMux()
 	h := api.HandlerFromMux(srv, r)
 	s := &http.Server{

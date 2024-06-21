@@ -1,5 +1,7 @@
 package vlcclient
 
+import "fmt"
+
 type VlcStatusResponse struct {
 	Fullscreen   int  `json:"fullscreen"`
 	SeekSec      int  `json:"seek_sec"`
@@ -30,6 +32,11 @@ type VlcStatusResponse struct {
 	Equalizer     []any  `json:"equalizer"`
 }
 
-//func (c Client) GetStatus() (VlcStatusResponse, error) {
-//
-//}
+func (c Client) GetStatus() (*VlcStatusResponse, error) {
+	var resp VlcStatusResponse
+	err := c.Do("/requests/status.json", nil, &resp)
+	if err != nil {
+		return nil, fmt.Errorf("GetStatus: %w", err)
+	}
+	return &resp, nil
+}

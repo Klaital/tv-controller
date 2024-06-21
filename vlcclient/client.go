@@ -1,6 +1,7 @@
 package vlcclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,24 +34,34 @@ func (c Client) constructUrl(endpoint string, queryParams map[string]string) str
 	return urlBuilder.String()
 }
 
-func (c Client) Do(file string, params map[string]string, outResponse any) (body []byte, err error) {
+func (c Client) Do(file string, params map[string]string, outResponse any) (err error) {
 	req, err := http.NewRequest(http.MethodGet, c.constructUrl(file, params), nil)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to construct request: %w", err)
+		return fmt.Errorf("Failed to construct request: %w", err)
 	}
 	req.SetBasicAuth(c.HttpUser, c.HttpPassword)
 	resp, err := http.DefaultClient.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to send http request to VLC: %w", err)
+		return fmt.Errorf("Failed to send http request to VLC: %w", err)
 	}
+	defer func() {
+		resp.Body.Close()
+	}()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("HTTP code indicates error: %s", resp.Status)
+		return fmt.Errorf("HTTP code indicates error: %s", resp.Status)
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read in response body: %w", err)
+		return fmt.Errorf("Failed to read in response body: %w", err)
+	}
+
+	// Deserialize the response body into the given struct
+	if outResponse != nil {
+		err = json.Unmarshal(respBody, outResponse)
+		if err != nil {
+			return fmt.Errorf("failed to parse response into given type: %w", err)
+		}
 	}
 	// Success!
-	return respBody, nil
+	return nil
 }

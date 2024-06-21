@@ -40,6 +40,9 @@ type ServerInterface interface {
 	// Update the playback settings
 	// (PUT /cfg)
 	SetConfig(w http.ResponseWriter, r *http.Request)
+	// Pause or unpause the VLC playback
+	// (PUT /ctrl/pause)
+	PausePlayback(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -72,6 +75,21 @@ func (siw *ServerInterfaceWrapper) SetConfig(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PausePlayback operation middleware
+func (siw *ServerInterfaceWrapper) PausePlayback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PausePlayback(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -197,6 +215,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/cfg", wrapper.GetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg", wrapper.SetConfig)
+	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/pause", wrapper.PausePlayback)
 
 	return m
 }
@@ -234,6 +253,21 @@ func (response SetConfig200JSONResponse) VisitSetConfigResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type PausePlaybackRequestObject struct {
+}
+
+type PausePlaybackResponseObject interface {
+	VisitPausePlaybackResponse(w http.ResponseWriter) error
+}
+
+type PausePlayback200Response struct {
+}
+
+func (response PausePlayback200Response) VisitPausePlaybackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Get the current playback settings
@@ -242,6 +276,9 @@ type StrictServerInterface interface {
 	// Update the playback settings
 	// (PUT /cfg)
 	SetConfig(ctx context.Context, request SetConfigRequestObject) (SetConfigResponseObject, error)
+	// Pause or unpause the VLC playback
+	// (PUT /ctrl/pause)
+	PausePlayback(ctx context.Context, request PausePlaybackRequestObject) (PausePlaybackResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -321,6 +358,30 @@ func (sh *strictHandler) SetConfig(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetConfigResponseObject); ok {
 		if err := validResponse.VisitSetConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PausePlayback operation middleware
+func (sh *strictHandler) PausePlayback(w http.ResponseWriter, r *http.Request) {
+	var request PausePlaybackRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PausePlayback(ctx, request.(PausePlaybackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PausePlayback")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PausePlaybackResponseObject); ok {
+		if err := validResponse.VisitPausePlaybackResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

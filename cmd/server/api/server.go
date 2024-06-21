@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/klaital/tv-controller/internal/config"
+	"github.com/klaital/tv-controller/vlcclient"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,11 +13,12 @@ import (
 var _ ServerInterface = (*Server)(nil)
 
 type Server struct {
-	Db *sql.DB
+	Db        *sql.DB
+	VlcClient *vlcclient.Client
 }
 
-func NewServer(db *sql.DB) Server {
-	return Server{Db: db}
+func NewServer(db *sql.DB, vlc *vlcclient.Client) Server {
+	return Server{Db: db, VlcClient: vlc}
 }
 
 func pointerTo[T any](s T) *T {
@@ -77,4 +79,15 @@ func (s Server) SetConfig(w http.ResponseWriter, req *http.Request) {
 
 	// echo the new config back to the client
 	w.Write(b)
+}
+
+func (s Server) PausePlayback(w http.ResponseWriter, req *http.Request) {
+	slog.Debug("Toggling pause")
+	err := s.VlcClient.PlayPause()
+	if err != nil {
+		slog.Error("Failed to play/pause", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -22,15 +22,15 @@ paths:
 #      responses:
 #        '200':
 #          description: Success
-#  /ctrl/pause:
-#    put:
-#      tags:
-#        - TV control
-#      summary: Pause or unpause the VLC playback
-#      operationId: pausePlayback
-#      responses:
-#        '200':
-#          description: Success
+  /ctrl/pause:
+    put:
+      tags:
+        - TV control
+      summary: Pause or unpause the VLC playback
+      operationId: pausePlayback
+      responses:
+        '200':
+          description: Success
 #  /ctrl/rewind:
 #    put:
 #      tags:
