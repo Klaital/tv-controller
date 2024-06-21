@@ -1,0 +1,118 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Wannet TV Controller
+  description: Send pre-configured remote control commands to a running VLC service
+paths:
+#  /ctrl/play:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Start VLC and launch the last playlist
+#      operationId: startPlayback
+#      responses:
+#        '200':
+#          description: Success
+#  /ctrl/stop:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Kill the running VLC process
+#      operationId: stopPlayback
+#      responses:
+#        '200':
+#          description: Success
+#  /ctrl/pause:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Pause or unpause the VLC playback
+#      operationId: pausePlayback
+#      responses:
+#        '200':
+#          description: Success
+#  /ctrl/rewind:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Skip back an amount of time in the current file
+#      operationId: rewindPlayback
+#      responses:
+#        '200':
+#          description: Success
+#  /ctrl/trackahead:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Skip to the next track in the playlist
+#      operationId: trackAhead
+#      responses:
+#        '200':
+#          description: Success
+#  /ctrl/trackback:
+#    put:
+#      tags:
+#        - TV control
+#      summary: Skip to the previous track in the playlist. May not work in shuffle mode?
+#      operationId: trackBack
+#      responses:
+#        '200':
+#          description: Success
+
+  /cfg:
+    get:
+      tags:
+        - Configuration
+      summary: Get the current playback settings
+      operationId: getConfig
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentPlaybackSettings'
+    put:
+      tags:
+        - Configuration
+      summary: Update the playback settings
+      operationId: setConfig
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPlaybackSettings'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentPlaybackSettings'
+components:
+  schemas:
+    # base types
+    CurrentPlaybackSettings:
+      type: object
+      properties:
+        playlists_available:
+          type: array
+          items:
+            type: string
+        playlist:
+          type: string
+          example: 'night random all'
+        shuffle:
+          type: boolean
+        loop:
+          type: boolean
+    NewPlaybackSettings:
+      type: object
+      properties:
+        playlist:
+          type: string
+          example: 'night random all'
+        shuffle:
+          type: boolean
+        loop:
+          type: boolean
