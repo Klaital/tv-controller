@@ -2,6 +2,7 @@ package config
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/mattn/go-sqlite3"
 	"log/slog"
@@ -31,16 +32,14 @@ func LoadConfig(db *sql.DB) *Config {
 	err := db.QueryRow("SELECT data FROM config LIMIT 1").Scan(&cfg)
 
 	if err != nil {
-		if sqlite3Err, ok := err.(sqlite3.Error); ok {
+		var sqlite3Err sqlite3.Error
+		if errors.As(err, &sqlite3Err) {
 			slog.Debug("Sqlite3 error", "error", sqlite3Err, "code", sqlite3Err.Code)
 			_, err := db.Exec("CREATE TABLE config (data JSONB)")
 			if err != nil {
 				slog.Error("Failed to initialize config table", "error", err)
 				os.Exit(1)
 			}
-		} else {
-			slog.Error("Failed to scan config data", "error", err)
-			os.Exit(1)
 		}
 	}
 

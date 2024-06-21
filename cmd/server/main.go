@@ -13,8 +13,8 @@ import (
 )
 
 func main() {
-	slog.Info("Connecting to DB")
 	dbfile := config.GetConfigDir() + "/config.db"
+	slog.Info("Connecting to DB", "db", dbfile)
 	os.Remove(dbfile)
 
 	db, err := sql.Open("sqlite3", dbfile)
