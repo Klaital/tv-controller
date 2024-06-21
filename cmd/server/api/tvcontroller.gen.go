@@ -43,6 +43,12 @@ type ServerInterface interface {
 	// Pause or unpause the VLC playback
 	// (PUT /ctrl/pause)
 	PausePlayback(w http.ResponseWriter, r *http.Request)
+	// Skip to the next track in the playlist
+	// (PUT /ctrl/trackahead)
+	TrackAhead(w http.ResponseWriter, r *http.Request)
+	// Skip to the previous track in the playlist. May not work in shuffle mode?
+	// (PUT /ctrl/trackback)
+	TrackBack(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -90,6 +96,36 @@ func (siw *ServerInterfaceWrapper) PausePlayback(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PausePlayback(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// TrackAhead operation middleware
+func (siw *ServerInterfaceWrapper) TrackAhead(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrackAhead(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// TrackBack operation middleware
+func (siw *ServerInterfaceWrapper) TrackBack(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TrackBack(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -216,6 +252,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/cfg", wrapper.GetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg", wrapper.SetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/pause", wrapper.PausePlayback)
+	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/trackahead", wrapper.TrackAhead)
+	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/trackback", wrapper.TrackBack)
 
 	return m
 }
@@ -268,6 +306,36 @@ func (response PausePlayback200Response) VisitPausePlaybackResponse(w http.Respo
 	return nil
 }
 
+type TrackAheadRequestObject struct {
+}
+
+type TrackAheadResponseObject interface {
+	VisitTrackAheadResponse(w http.ResponseWriter) error
+}
+
+type TrackAhead200Response struct {
+}
+
+func (response TrackAhead200Response) VisitTrackAheadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type TrackBackRequestObject struct {
+}
+
+type TrackBackResponseObject interface {
+	VisitTrackBackResponse(w http.ResponseWriter) error
+}
+
+type TrackBack200Response struct {
+}
+
+func (response TrackBack200Response) VisitTrackBackResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Get the current playback settings
@@ -279,6 +347,12 @@ type StrictServerInterface interface {
 	// Pause or unpause the VLC playback
 	// (PUT /ctrl/pause)
 	PausePlayback(ctx context.Context, request PausePlaybackRequestObject) (PausePlaybackResponseObject, error)
+	// Skip to the next track in the playlist
+	// (PUT /ctrl/trackahead)
+	TrackAhead(ctx context.Context, request TrackAheadRequestObject) (TrackAheadResponseObject, error)
+	// Skip to the previous track in the playlist. May not work in shuffle mode?
+	// (PUT /ctrl/trackback)
+	TrackBack(ctx context.Context, request TrackBackRequestObject) (TrackBackResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -382,6 +456,54 @@ func (sh *strictHandler) PausePlayback(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PausePlaybackResponseObject); ok {
 		if err := validResponse.VisitPausePlaybackResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrackAhead operation middleware
+func (sh *strictHandler) TrackAhead(w http.ResponseWriter, r *http.Request) {
+	var request TrackAheadRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrackAhead(ctx, request.(TrackAheadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrackAhead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrackAheadResponseObject); ok {
+		if err := validResponse.VisitTrackAheadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TrackBack operation middleware
+func (sh *strictHandler) TrackBack(w http.ResponseWriter, r *http.Request) {
+	var request TrackBackRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TrackBack(ctx, request.(TrackBackRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TrackBack")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TrackBackResponseObject); ok {
+		if err := validResponse.VisitTrackBackResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -40,24 +40,24 @@ paths:
 #      responses:
 #        '200':
 #          description: Success
-#  /ctrl/trackahead:
-#    put:
-#      tags:
-#        - TV control
-#      summary: Skip to the next track in the playlist
-#      operationId: trackAhead
-#      responses:
-#        '200':
-#          description: Success
-#  /ctrl/trackback:
-#    put:
-#      tags:
-#        - TV control
-#      summary: Skip to the previous track in the playlist. May not work in shuffle mode?
-#      operationId: trackBack
-#      responses:
-#        '200':
-#          description: Success
+  /ctrl/trackahead:
+    put:
+      tags:
+        - TV control
+      summary: Skip to the next track in the playlist
+      operationId: trackAhead
+      responses:
+        '200':
+          description: Success
+  /ctrl/trackback:
+    put:
+      tags:
+        - TV control
+      summary: Skip to the previous track in the playlist. May not work in shuffle mode?
+      operationId: trackBack
+      responses:
+        '200':
+          description: Success
 
   /cfg:
     get:

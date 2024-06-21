@@ -91,3 +91,25 @@ func (s Server) PausePlayback(w http.ResponseWriter, req *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (s Server) TrackAhead(w http.ResponseWriter, req *http.Request) {
+	slog.Debug("Skipping ahead in playlist")
+	err := s.VlcClient.TrackAhead()
+	if err != nil {
+		slog.Error("Failed to trackahead", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s Server) TrackBack(w http.ResponseWriter, req *http.Request) {
+	slog.Debug("Backtracking in playlist")
+	err := s.VlcClient.TrackBack()
+	if err != nil {
+		slog.Error("Failed to trackback", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
