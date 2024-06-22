@@ -42,17 +42,35 @@ func main() {
 	//slog.Debug("GetStatus", "error", err, "status", vlcStatus)
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
-		slog.Info("Timeout calling VLC. Re-launching service", "error", err)
+		slog.Info("Timeout calling VLC. Re-launching service")
 		vlcWait := sync.WaitGroup{}
 		vlcWait.Add(1)
 		// Launch VLC as a background process that will live as long as this server process is running.
 		go func() {
-			cmd := exec.Command("/mnt/c/Program Files/VideoLAN/VLC/vlc.exe", "--http-host=127.0.0.1", "--http-port=8090", "--extraintf=http", "--http-password=bedroomtv123")
-			err = cmd.Run()
+			args := []string{
+				"--http-host=127.0.0.1",
+				"--http-port=8090",
+				"--extraintf=http",
+				"--http-password=bedroomtv123",
+			}
+			if cfg.Shuffle {
+				args = append(args, "--random")
+			}
+			if cfg.Loop {
+				args = append(args, "--loop")
+			}
+
+			if len(cfg.SelectedPlaylist) > 0 {
+				slog.Debug("Starting with playlist enabled", "playlist", cfg.SelectedPlaylist)
+				args = append(args, fmt.Sprintf("%s/playlists/%s", config.GetConfigDir(), cfg.SelectedPlaylist))
+			}
+			cmd := exec.Command(cfg.VlcPath, args...)
+			err = cmd.Start()
 			if err != nil {
 				slog.Error("Failed to launch vlc", "error", err)
 				os.Exit(1)
 			}
+
 			vlcWait.Done()
 		}()
 
@@ -62,9 +80,11 @@ func main() {
 		if err != nil {
 			slog.Error("Still cannot connect to VLC. Check settings", "error", err)
 			os.Exit(1)
+		} else {
+			slog.Debug("Initialized connection to VLC server")
 		}
 	} else if err != nil {
-		slog.Error("Failed to fetch initial status from VLC")
+		slog.Error("Failed to fetch initial status from VLC", "error", err)
 		os.Exit(1)
 	}
 	// synchronize settings. Set loop and shuffle settings if needed to make VLC match the user's saved preferences
@@ -72,12 +92,16 @@ func main() {
 		if err = vlcClient.Random(); err != nil {
 			slog.Error("Failed to set VLC random setting to match saved config", "error", err)
 			os.Exit(1)
+		} else {
+			slog.Debug("Updated Shuffle setting = %t", cfg.Shuffle)
 		}
 	}
 	if vlcStatus.Loop != cfg.Loop {
 		if err = vlcClient.Loop(); err != nil {
 			slog.Error("Failed to set VLC loop setting to match saved config", "error", err)
 			os.Exit(1)
+		} else {
+			slog.Debug("Updated Loop setting = %t", cfg.Loop)
 		}
 	}
 

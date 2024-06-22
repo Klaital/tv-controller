@@ -17,6 +17,17 @@ type Config struct {
 	SelectedPlaylist   string   `json:"selected_playlist"`
 	Shuffle            bool     `json:"shuffle"`
 	Loop               bool     `json:"loop"`
+	VlcPath            string   `json:"vlc_path"`
+}
+
+func NewConfig() *Config {
+	return &Config{
+		PlaylistsAvailable: make([]string, 0),
+		SelectedPlaylist:   "",
+		Shuffle:            false,
+		Loop:               false,
+		VlcPath:            "/mnt/c/Program Files/VideoLAN/VLC/vlc.exe", // this is correct for a windows dev machine using WSL
+	}
 }
 
 func GetConfigDir() string {
@@ -30,9 +41,8 @@ func GetConfigDir() string {
 
 func LoadConfig(db *sql.DB) *Config {
 	// lazy-init: create the empty config if none exists
-	var cfg Config
+	var cfg *Config
 	err := db.QueryRow("SELECT data FROM config LIMIT 1").Scan(&cfg)
-
 	if err != nil {
 		var sqlite3Err sqlite3.Error
 		if errors.As(err, &sqlite3Err) {
@@ -43,13 +53,17 @@ func LoadConfig(db *sql.DB) *Config {
 				os.Exit(1)
 			} else {
 				slog.Info("Created config table")
-				_, err := db.Exec("INSERT INTO config (data) VALUES (?)", &Config{})
+				_, err := db.Exec("INSERT INTO config (data) VALUES (?)", NewConfig())
 				if err != nil {
 					slog.Error("Failed to write default config settings", "error", err)
 				} else {
 					slog.Info("Initialized config db with default settings")
 				}
+				cfg = NewConfig()
 			}
+		} else {
+			slog.Error("Error querying config data", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -63,7 +77,7 @@ func LoadConfig(db *sql.DB) *Config {
 		cfg.PlaylistsAvailable = append(cfg.PlaylistsAvailable, playlistFiles[i].Name())
 	}
 
-	return &cfg
+	return cfg
 }
 
 func SaveConfig(cfg *Config, db *sql.DB) {

@@ -121,20 +121,25 @@ components:
           type: array
           items:
             type: string
-        playlist:
+        selected_playlist:
           type: string
-          example: 'night random all'
+          example: 'night_all.m3u'
         shuffle:
           type: boolean
         loop:
           type: boolean
+        vlc_path:
+          type: string
+        
     NewPlaybackSettings:
       type: object
       properties:
-        playlist:
+        selected_playlist:
           type: string
-          example: 'night random all'
+          example: 'night_all.m3u'
         shuffle:
           type: boolean
         loop:
           type: boolean
+        vlc_path:
+          type: string

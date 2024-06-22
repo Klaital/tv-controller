@@ -17,16 +17,18 @@ import (
 // CurrentPlaybackSettings defines model for CurrentPlaybackSettings.
 type CurrentPlaybackSettings struct {
 	Loop               *bool     `json:"loop,omitempty"`
-	Playlist           *string   `json:"playlist,omitempty"`
 	PlaylistsAvailable *[]string `json:"playlists_available,omitempty"`
+	SelectedPlaylist   *string   `json:"selected_playlist,omitempty"`
 	Shuffle            *bool     `json:"shuffle,omitempty"`
+	VlcPath            *string   `json:"vlc_path,omitempty"`
 }
 
 // NewPlaybackSettings defines model for NewPlaybackSettings.
 type NewPlaybackSettings struct {
-	Loop     *bool   `json:"loop,omitempty"`
-	Playlist *string `json:"playlist,omitempty"`
-	Shuffle  *bool   `json:"shuffle,omitempty"`
+	Loop             *bool   `json:"loop,omitempty"`
+	SelectedPlaylist *string `json:"selected_playlist,omitempty"`
+	Shuffle          *bool   `json:"shuffle,omitempty"`
+	VlcPath          *string `json:"vlc_path,omitempty"`
 }
 
 // SetConfigJSONRequestBody defines body for SetConfig for application/json ContentType.

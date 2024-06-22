@@ -3,7 +3,7 @@ package vlcclient
 import "fmt"
 
 type VlcStatusResponse struct {
-	Fullscreen   bool `json:"fullscreen"`
+	Fullscreen   int  `json:"fullscreen"`
 	SeekSec      int  `json:"seek_sec"`
 	ApiVersion   int  `json:"apiversion"`
 	CurrentPlId  int  `json:"currentplid"`
