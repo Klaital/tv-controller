@@ -56,3 +56,15 @@ func (c Client) Random() error {
 	// Success!
 	return nil
 }
+
+func (c Client) StartPlaylist(playlist string) error {
+	err := c.Do("/requests/status.json", map[string]string{
+		"command": "in_play",
+		"input":   playlist,
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("StartPlaylist: %w", err)
+	}
+	// Success!
+	return nil
+}

@@ -147,3 +147,50 @@ func (s Server) ToggleLoop(w http.ResponseWriter, req *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (s Server) SelectPlaylist(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig(s.Db)
+
+	var playlistRequest SelectPlaylistRequest
+	b, err := io.ReadAll(req.Body)
+	req.Body.Close()
+	if err != nil {
+		slog.Error("Failed to read request body", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	err = json.Unmarshal(b, &playlistRequest)
+	if err != nil {
+		slog.Error("Failed to unmarshal request body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Validate palylist selection
+	found := false
+	for _, playlist := range cfg.PlaylistsAvailable {
+		if playlist == *playlistRequest.Playlist {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		slog.Debug("Requested playlist not found", "playlist", playlistRequest.Playlist)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Tell VLC to start playing the specified playlist
+	err = s.VlcClient.StartPlaylist(*playlistRequest.Playlist)
+	if err != nil {
+		slog.Error("Failed to have VLC change playlists", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// save the setting change
+	config.SaveConfig(cfg, s.Db)
+
+	w.WriteHeader(http.StatusNoContent)
+}

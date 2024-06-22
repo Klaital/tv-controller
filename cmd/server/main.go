@@ -52,11 +52,14 @@ func main() {
 				"--http-port=8090",
 				"--extraintf=http",
 				"--http-password=bedroomtv123",
+				"--fullscreen",
 			}
 			if cfg.Shuffle {
+				slog.Debug("Enabling shuffle mode on VLC startup")
 				args = append(args, "--random")
 			}
 			if cfg.Loop {
+				slog.Debug("Enabling loop mode on VLC startup")
 				args = append(args, "--loop")
 			}
 

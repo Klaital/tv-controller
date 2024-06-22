@@ -31,8 +31,16 @@ type NewPlaybackSettings struct {
 	VlcPath          *string `json:"vlc_path,omitempty"`
 }
 
+// SelectPlaylistRequest defines model for SelectPlaylistRequest.
+type SelectPlaylistRequest struct {
+	Playlist *string `json:"playlist,omitempty"`
+}
+
 // SetConfigJSONRequestBody defines body for SetConfig for application/json ContentType.
 type SetConfigJSONRequestBody = NewPlaybackSettings
+
+// SelectPlaylistJSONRequestBody defines body for SelectPlaylist for application/json ContentType.
+type SelectPlaylistJSONRequestBody = SelectPlaylistRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -45,6 +53,9 @@ type ServerInterface interface {
 	// toggle eternal playback
 	// (PUT /cfg/loop)
 	ToggleLoop(w http.ResponseWriter, r *http.Request)
+	// select a playlist
+	// (PUT /cfg/playlist)
+	SelectPlaylist(w http.ResponseWriter, r *http.Request)
 	// toggle random playback
 	// (PUT /cfg/shuffle)
 	ToggleShuffle(w http.ResponseWriter, r *http.Request)
@@ -104,6 +115,21 @@ func (siw *ServerInterfaceWrapper) ToggleLoop(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ToggleLoop(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// SelectPlaylist operation middleware
+func (siw *ServerInterfaceWrapper) SelectPlaylist(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SelectPlaylist(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -290,6 +316,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/cfg", wrapper.GetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg", wrapper.SetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg/loop", wrapper.ToggleLoop)
+	m.HandleFunc("PUT "+options.BaseURL+"/cfg/playlist", wrapper.SelectPlaylist)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg/shuffle", wrapper.ToggleShuffle)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/pause", wrapper.PausePlayback)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/trackahead", wrapper.TrackAhead)
@@ -342,6 +369,22 @@ type ToggleLoop200Response struct {
 }
 
 func (response ToggleLoop200Response) VisitToggleLoopResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type SelectPlaylistRequestObject struct {
+	Body *SelectPlaylistJSONRequestBody
+}
+
+type SelectPlaylistResponseObject interface {
+	VisitSelectPlaylistResponse(w http.ResponseWriter) error
+}
+
+type SelectPlaylist200Response struct {
+}
+
+func (response SelectPlaylist200Response) VisitSelectPlaylistResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
@@ -417,6 +460,9 @@ type StrictServerInterface interface {
 	// toggle eternal playback
 	// (PUT /cfg/loop)
 	ToggleLoop(ctx context.Context, request ToggleLoopRequestObject) (ToggleLoopResponseObject, error)
+	// select a playlist
+	// (PUT /cfg/playlist)
+	SelectPlaylist(ctx context.Context, request SelectPlaylistRequestObject) (SelectPlaylistResponseObject, error)
 	// toggle random playback
 	// (PUT /cfg/shuffle)
 	ToggleShuffle(ctx context.Context, request ToggleShuffleRequestObject) (ToggleShuffleResponseObject, error)
@@ -532,6 +578,37 @@ func (sh *strictHandler) ToggleLoop(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ToggleLoopResponseObject); ok {
 		if err := validResponse.VisitToggleLoopResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SelectPlaylist operation middleware
+func (sh *strictHandler) SelectPlaylist(w http.ResponseWriter, r *http.Request) {
+	var request SelectPlaylistRequestObject
+
+	var body SelectPlaylistJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SelectPlaylist(ctx, request.(SelectPlaylistRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SelectPlaylist")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SelectPlaylistResponseObject); ok {
+		if err := validResponse.VisitSelectPlaylistResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

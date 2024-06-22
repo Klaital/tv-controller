@@ -73,6 +73,7 @@ func LoadConfig(db *sql.DB) *Config {
 		slog.Error("Failed to list playlist files", "error", err.Error())
 		os.Exit(1)
 	}
+	cfg.PlaylistsAvailable = make([]string, 0, len(playlistFiles))
 	for i := range playlistFiles {
 		cfg.PlaylistsAvailable = append(cfg.PlaylistsAvailable, playlistFiles[i].Name())
 	}

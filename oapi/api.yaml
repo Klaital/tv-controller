@@ -109,6 +109,22 @@ paths:
       responses:
         '200':
           description: success
+  /cfg/playlist:
+    put:
+      tags:
+        - Configuration
+      summary: select a playlist
+      description: causes VLC to start playing this playlist, and saves it in the config store to launch as default next time.
+      operationId: selectPlaylist
+      requestBody:
+        description: Specify a playlist to use
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectPlaylistRequest'
+      responses:
+        '200':
+          description: success
 
 
 components:
@@ -130,7 +146,7 @@ components:
           type: boolean
         vlc_path:
           type: string
-        
+
     NewPlaybackSettings:
       type: object
       properties:
@@ -142,4 +158,9 @@ components:
         loop:
           type: boolean
         vlc_path:
+          type: string
+    SelectPlaylistRequest:
+      type: object
+      properties:
+        playlist:
           type: string
