@@ -2,6 +2,8 @@ package config
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/mattn/go-sqlite3"
@@ -39,6 +41,14 @@ func LoadConfig(db *sql.DB) *Config {
 			if err != nil {
 				slog.Error("Failed to initialize config table", "error", err)
 				os.Exit(1)
+			} else {
+				slog.Info("Created config table")
+				_, err := db.Exec("INSERT INTO config (data) VALUES (?)", &Config{})
+				if err != nil {
+					slog.Error("Failed to write default config settings", "error", err)
+				} else {
+					slog.Info("Initialized config db with default settings")
+				}
 			}
 		}
 	}
@@ -61,5 +71,24 @@ func SaveConfig(cfg *Config, db *sql.DB) {
 	if err != nil {
 		slog.Error("Failed to write config update", "error", err)
 		os.Exit(1)
+	} else {
+		slog.Debug("Updated config settings")
 	}
+}
+
+// Value implements the driver.Valuer interface. This method
+// simply returns the JSON-encoded representation of the struct.
+func (c Config) Value() (driver.Value, error) {
+	return json.Marshal(c)
+}
+
+// Scan implements the sql.Scanner interface. This method
+// simply decodes a JSON-encoded value into the struct fields.
+func (c *Config) Scan(value interface{}) error {
+	b, ok := value.([]byte)
+	if !ok {
+		return errors.New("type assertion to []byte failed")
+	}
+
+	return json.Unmarshal(b, &c)
 }

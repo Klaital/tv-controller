@@ -53,7 +53,7 @@ paths:
     put:
       tags:
         - TV control
-      summary: Skip to the previous track in the playlist. May not work in shuffle mode?
+      summary: Skip to the previous track in the playlist.
       operationId: trackBack
       responses:
         '200':
@@ -89,6 +89,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CurrentPlaybackSettings'
+  /cfg/shuffle:
+    put:
+      tags:
+        - Configuration
+      summary: toggle random playback
+      description: toggles the VLC player's current setting, and updates the config db to match the new value
+      operationId: toggleShuffle
+      responses:
+        '200':
+          description: success
+  /cfg/loop:
+    put:
+      tags:
+        - Configuration
+      summary: toggle eternal playback
+      description: toggles the VLC player's current setting, and updates the config db to match the new value
+      operationId: toggleLoop
+      responses:
+        '200':
+          description: success
+
+
 components:
   schemas:
     # base types

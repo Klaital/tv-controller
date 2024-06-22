@@ -40,13 +40,19 @@ type ServerInterface interface {
 	// Update the playback settings
 	// (PUT /cfg)
 	SetConfig(w http.ResponseWriter, r *http.Request)
+	// toggle eternal playback
+	// (PUT /cfg/loop)
+	ToggleLoop(w http.ResponseWriter, r *http.Request)
+	// toggle random playback
+	// (PUT /cfg/shuffle)
+	ToggleShuffle(w http.ResponseWriter, r *http.Request)
 	// Pause or unpause the VLC playback
 	// (PUT /ctrl/pause)
 	PausePlayback(w http.ResponseWriter, r *http.Request)
 	// Skip to the next track in the playlist
 	// (PUT /ctrl/trackahead)
 	TrackAhead(w http.ResponseWriter, r *http.Request)
-	// Skip to the previous track in the playlist. May not work in shuffle mode?
+	// Skip to the previous track in the playlist.
 	// (PUT /ctrl/trackback)
 	TrackBack(w http.ResponseWriter, r *http.Request)
 }
@@ -81,6 +87,36 @@ func (siw *ServerInterfaceWrapper) SetConfig(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ToggleLoop operation middleware
+func (siw *ServerInterfaceWrapper) ToggleLoop(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ToggleLoop(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ToggleShuffle operation middleware
+func (siw *ServerInterfaceWrapper) ToggleShuffle(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ToggleShuffle(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -251,6 +287,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc("GET "+options.BaseURL+"/cfg", wrapper.GetConfig)
 	m.HandleFunc("PUT "+options.BaseURL+"/cfg", wrapper.SetConfig)
+	m.HandleFunc("PUT "+options.BaseURL+"/cfg/loop", wrapper.ToggleLoop)
+	m.HandleFunc("PUT "+options.BaseURL+"/cfg/shuffle", wrapper.ToggleShuffle)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/pause", wrapper.PausePlayback)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/trackahead", wrapper.TrackAhead)
 	m.HandleFunc("PUT "+options.BaseURL+"/ctrl/trackback", wrapper.TrackBack)
@@ -289,6 +327,36 @@ func (response SetConfig200JSONResponse) VisitSetConfigResponse(w http.ResponseW
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type ToggleLoopRequestObject struct {
+}
+
+type ToggleLoopResponseObject interface {
+	VisitToggleLoopResponse(w http.ResponseWriter) error
+}
+
+type ToggleLoop200Response struct {
+}
+
+func (response ToggleLoop200Response) VisitToggleLoopResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ToggleShuffleRequestObject struct {
+}
+
+type ToggleShuffleResponseObject interface {
+	VisitToggleShuffleResponse(w http.ResponseWriter) error
+}
+
+type ToggleShuffle200Response struct {
+}
+
+func (response ToggleShuffle200Response) VisitToggleShuffleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
 }
 
 type PausePlaybackRequestObject struct {
@@ -344,13 +412,19 @@ type StrictServerInterface interface {
 	// Update the playback settings
 	// (PUT /cfg)
 	SetConfig(ctx context.Context, request SetConfigRequestObject) (SetConfigResponseObject, error)
+	// toggle eternal playback
+	// (PUT /cfg/loop)
+	ToggleLoop(ctx context.Context, request ToggleLoopRequestObject) (ToggleLoopResponseObject, error)
+	// toggle random playback
+	// (PUT /cfg/shuffle)
+	ToggleShuffle(ctx context.Context, request ToggleShuffleRequestObject) (ToggleShuffleResponseObject, error)
 	// Pause or unpause the VLC playback
 	// (PUT /ctrl/pause)
 	PausePlayback(ctx context.Context, request PausePlaybackRequestObject) (PausePlaybackResponseObject, error)
 	// Skip to the next track in the playlist
 	// (PUT /ctrl/trackahead)
 	TrackAhead(ctx context.Context, request TrackAheadRequestObject) (TrackAheadResponseObject, error)
-	// Skip to the previous track in the playlist. May not work in shuffle mode?
+	// Skip to the previous track in the playlist.
 	// (PUT /ctrl/trackback)
 	TrackBack(ctx context.Context, request TrackBackRequestObject) (TrackBackResponseObject, error)
 }
@@ -432,6 +506,54 @@ func (sh *strictHandler) SetConfig(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetConfigResponseObject); ok {
 		if err := validResponse.VisitSetConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ToggleLoop operation middleware
+func (sh *strictHandler) ToggleLoop(w http.ResponseWriter, r *http.Request) {
+	var request ToggleLoopRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ToggleLoop(ctx, request.(ToggleLoopRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ToggleLoop")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ToggleLoopResponseObject); ok {
+		if err := validResponse.VisitToggleLoopResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ToggleShuffle operation middleware
+func (sh *strictHandler) ToggleShuffle(w http.ResponseWriter, r *http.Request) {
+	var request ToggleShuffleRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ToggleShuffle(ctx, request.(ToggleShuffleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ToggleShuffle")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ToggleShuffleResponseObject); ok {
+		if err := validResponse.VisitToggleShuffleResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

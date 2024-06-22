@@ -42,6 +42,7 @@ func (c Client) Do(file string, params map[string]string, outResponse any) (err 
 	req.SetBasicAuth(c.HttpUser, c.HttpPassword)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		fmt.Printf("HTTP I/O Error type: %T\n", err)
 		return fmt.Errorf("Failed to send http request to VLC: %w", err)
 	}
 	defer func() {

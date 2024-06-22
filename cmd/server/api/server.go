@@ -60,20 +60,6 @@ func (s Server) SetConfig(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	oldCfg := config.LoadConfig(s.Db)
-	// Detect changes and update VLC's settings to match
-	if newCfg.SelectedPlaylist != oldCfg.SelectedPlaylist {
-		slog.Debug("New playlist requested", "old", oldCfg.SelectedPlaylist, "new", newCfg.SelectedPlaylist)
-		// TODO: command VLC to start the new playlist
-	}
-	if newCfg.Shuffle != oldCfg.Shuffle {
-		slog.Debug("Shuffle toggled", "old", oldCfg.Shuffle, "new", newCfg.Shuffle)
-		// TODO: command VLC to switch to/from shuffle mode
-	}
-	if newCfg.Loop != oldCfg.Loop {
-		slog.Debug("Loop toggled", "old", oldCfg.Loop, "new", newCfg.Loop)
-		// TODO: command VLC to switch to/from loop mode
-	}
 	// Save updates to disk
 	config.SaveConfig(&newCfg, s.Db)
 
@@ -111,5 +97,53 @@ func (s Server) TrackBack(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s Server) ToggleShuffle(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig(s.Db)
+	// Load the current state of the VLC player to determine what commands to send
+	vlcStatus, err := s.VlcClient.GetStatus()
+	if err != nil {
+		slog.Error("Failed to fetch current status from VLC", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// toggle the VLC player's setting, then save that value to the config store
+	cfg.Shuffle = !vlcStatus.Random
+	err = s.VlcClient.Random()
+	if err != nil {
+		slog.Error("Failed to toggle random setting on VLC", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// save the setting change
+	config.SaveConfig(cfg, s.Db)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s Server) ToggleLoop(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig(s.Db)
+	// Load the current state of the VLC player to determine what commands to send
+	vlcStatus, err := s.VlcClient.GetStatus()
+	if err != nil {
+		slog.Error("Failed to fetch current status from VLC", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// toggle the VLC player's setting, then save that value to the config store
+	cfg.Loop = !vlcStatus.Loop
+	err = s.VlcClient.Loop()
+	if err != nil {
+		slog.Error("Failed to toggle loop setting on VLC", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// save the setting change
+	config.SaveConfig(cfg, s.Db)
+
 	w.WriteHeader(http.StatusNoContent)
 }
