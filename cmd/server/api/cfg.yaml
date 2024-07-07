@@ -3,5 +3,4 @@ package: api
 output: tvcontroller.gen.go
 generate:
   models: true
-  std-http-server: true
-  strict-server: true
+  gorilla-server: true

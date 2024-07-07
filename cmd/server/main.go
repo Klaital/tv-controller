@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/klaital/tv-controller/cmd/server/api"
 	"github.com/klaital/tv-controller/internal/config"
 	"github.com/klaital/tv-controller/vlcclient"
@@ -42,9 +43,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	router := mux.NewRouter()
+	spa := spaHandler{
+		staticPath: "tv-controller-web/dist",
+		indexPath:  "index.html",
+	}
+	router.PathPrefix("/web").Handler(spa)
+
 	srv := api.NewServer(db, vlcClient)
-	r := http.NewServeMux()
-	h := api.HandlerFromMux(srv, r)
+	h := api.HandlerFromMux(srv, router)
+
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"http://localhost:3000", "http://localhost:8080", "http://bedroom-tv"},
 		AllowedMethods: []string{"GET", "PUT"},
