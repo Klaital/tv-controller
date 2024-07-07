@@ -7,6 +7,7 @@ import (
 	"github.com/klaital/tv-controller/internal/config"
 	"github.com/klaital/tv-controller/vlcclient"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/cors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -44,8 +45,12 @@ func main() {
 	srv := api.NewServer(db, vlcClient)
 	r := http.NewServeMux()
 	h := api.HandlerFromMux(srv, r)
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"http://localhost:3000", "http://localhost:8080", "http://bedroom-tv"},
+		AllowedMethods: []string{"GET", "PUT"},
+	})
 	s := &http.Server{
-		Handler: h,
+		Handler: c.Handler(h),
 		Addr:    "0.0.0.0:8080",
 	}
 
