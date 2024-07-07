@@ -182,11 +182,14 @@ func (s Server) SelectPlaylist(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Tell VLC to start playing the specified playlist
-	err = s.VlcClient.StartPlaylist(*playlistRequest.Playlist)
+	cfg.SelectedPlaylist = *playlistRequest.Playlist
+	err = cfg.StopVlc()
 	if err != nil {
-		slog.Error("Failed to have VLC change playlists", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		slog.Error("Failed to stop existing VLC instance", "error", err)
+	}
+	err = cfg.StartVlc()
+	if err != nil {
+		slog.Error("Failed to start new VLC instance", "error", err)
 	}
 
 	// save the setting change

@@ -13,6 +13,10 @@ type Client struct {
 	Addr         string // in the form of host:port, e.g. "localhost:8090"
 	HttpUser     string // it seems VLC ensures this is always empty string
 	HttpPassword string // VLC requires this to be set at runtime
+
+	// used for launching VLC server
+	HttpHost string
+	HttpPort string
 }
 
 func (c Client) constructUrl(endpoint string, queryParams map[string]string) string {

@@ -9,7 +9,9 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/user"
+	"path/filepath"
 )
 
 type Config struct {
@@ -18,6 +20,8 @@ type Config struct {
 	Shuffle            bool     `json:"shuffle"`
 	Loop               bool     `json:"loop"`
 	VlcPath            string   `json:"vlc_path"`
+
+	vlc *exec.Cmd
 }
 
 func NewConfig() *Config {
@@ -26,7 +30,7 @@ func NewConfig() *Config {
 		SelectedPlaylist:   "",
 		Shuffle:            false,
 		Loop:               false,
-		VlcPath:            "/mnt/c/Program Files/VideoLAN/VLC/vlc.exe", // this is correct for a windows dev machine using WSL
+		VlcPath:            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe", // this is correct for a windows dev machine using WSL
 	}
 }
 
@@ -36,10 +40,19 @@ func GetConfigDir() string {
 		slog.Error("Failed to load current user", "error", err)
 		os.Exit(1)
 	}
-	return fmt.Sprintf("%s/%s", u.HomeDir, ".tvcfg")
+	return filepath.Join(u.HomeDir, ".tvcfg")
 }
 
+func GetPlaylistPath(playlistName string) string {
+	return filepath.Join(GetConfigDir(), "playlists", playlistName)
+}
+
+var singleton *Config
+
 func LoadConfig(db *sql.DB) *Config {
+	if singleton != nil {
+		return singleton
+	}
 	// lazy-init: create the empty config if none exists
 	var cfg *Config
 	err := db.QueryRow("SELECT data FROM config LIMIT 1").Scan(&cfg)
@@ -78,6 +91,7 @@ func LoadConfig(db *sql.DB) *Config {
 		cfg.PlaylistsAvailable = append(cfg.PlaylistsAvailable, playlistFiles[i].Name())
 	}
 
+	singleton = cfg
 	return cfg
 }
 
@@ -93,7 +107,7 @@ func SaveConfig(cfg *Config, db *sql.DB) {
 
 // Value implements the driver.Valuer interface. This method
 // simply returns the JSON-encoded representation of the struct.
-func (c Config) Value() (driver.Value, error) {
+func (c *Config) Value() (driver.Value, error) {
 	return json.Marshal(c)
 }
 
@@ -106,4 +120,48 @@ func (c *Config) Scan(value interface{}) error {
 	}
 
 	return json.Unmarshal(b, &c)
+}
+
+func (c *Config) StartVlc() error {
+	args := []string{
+		fmt.Sprintf("--http-host=%s", "127.0.0.1"),
+		fmt.Sprintf("--http-port=%s", "8090"),
+		fmt.Sprintf("--http-password=%s", "bedroomtv123"),
+		"--extraintf=http",
+		"--fullscreen",
+	}
+
+	if c.Shuffle {
+		args = append(args, "--random")
+	}
+	if c.Loop {
+		args = append(args, "--loop")
+	}
+
+	if len(c.SelectedPlaylist) > 0 {
+		args = append(args, GetPlaylistPath(c.SelectedPlaylist))
+	}
+
+	c.vlc = exec.Command(c.VlcPath, args...)
+	slog.Debug("Launching VLC", "cmd", c.vlc.String())
+	err := c.vlc.Start()
+	if err != nil {
+		slog.Error("Failed to start VLC", "error", err)
+		return fmt.Errorf("failed to start VLC: %w", err)
+	}
+
+	// Success!
+	return nil
+}
+
+func (c *Config) StopVlc() error {
+	if c.vlc == nil {
+		slog.Error("VLC already stopped")
+		return errors.New("VLC already stopped")
+	}
+	if c.vlc.Process == nil {
+		slog.Error("no handle to VLC process")
+		return errors.New("no handle to VLC process")
+	}
+	return c.vlc.Process.Kill()
 }
