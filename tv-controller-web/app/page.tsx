@@ -1,9 +1,8 @@
 'use client'
 
-import Image from "next/image";
-import ConfigPanel, {Config} from "@/app/config/config";
+import ConfigPanel from "@/app/config/config";
 import React, {useEffect, useState} from "react";
-import {getConfig, GetConfigResponse, selectPlaylist} from "@/app/vlccontrol";
+import {getConfig, GetConfigResponse, pausePlayback, selectPlaylist} from "@/app/vlccontrol";
 import {createClient} from "@hey-api/client-fetch";
 
 
@@ -66,8 +65,28 @@ export default function Home() {
     }, []);
   return (
       <main>
-        <h1>TV Control</h1>
-        <ConfigPanel cfg={cfg} selectPlaylist={chooseNewPlaylist} />
+          <h1>Playlists</h1>
+          <ConfigPanel cfg={cfg} selectPlaylist={chooseNewPlaylist} />
+
+          <div className="playback-control">
+              <h2>Playback Controls</h2>
+              <a
+                  onClick={(e: React.MouseEvent<HTMLElement>) => {
+                      e.preventDefault();
+                      pausePlayback()
+                          .then((resp) => {
+                              console.log("playback paused")
+                          })
+                          .catch((err) => {
+                              console.log("playback pause error: " + err);
+                          })
+                  }}
+                  className="playlist inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"
+              >
+                  ⏯
+              </a>
+          </div>
+
       </main>
   );
 }
