@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"github.com/klaital/tv-controller/internal/config"
 	"github.com/klaital/tv-controller/vlcclient"
@@ -13,12 +12,11 @@ import (
 var _ ServerInterface = (*Server)(nil)
 
 type Server struct {
-	Db        *sql.DB
 	VlcClient *vlcclient.Client
 }
 
-func NewServer(db *sql.DB, vlc *vlcclient.Client) Server {
-	return Server{Db: db, VlcClient: vlc}
+func NewServer(vlc *vlcclient.Client) Server {
+	return Server{VlcClient: vlc}
 }
 
 func pointerTo[T any](s T) *T {
@@ -26,8 +24,8 @@ func pointerTo[T any](s T) *T {
 }
 
 // GET /cfg
-func (s Server) GetConfig(w http.ResponseWriter, req *http.Request) {
-	cfg := config.LoadConfig(s.Db)
+func (s *Server) GetConfig(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig()
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		slog.Error("Failed to serialize config data", "error", err)
@@ -43,7 +41,7 @@ func (s Server) GetConfig(w http.ResponseWriter, req *http.Request) {
 }
 
 // PUT /cfg
-func (s Server) SetConfig(w http.ResponseWriter, req *http.Request) {
+func (s *Server) SetConfig(w http.ResponseWriter, req *http.Request) {
 	// read the new config value
 	var newCfg config.Config
 	b, err := io.ReadAll(req.Body)
@@ -61,13 +59,13 @@ func (s Server) SetConfig(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Save updates to disk
-	config.SaveConfig(&newCfg, s.Db)
+	config.SaveConfig(&newCfg)
 
 	// echo the new config back to the client
 	w.Write(b)
 }
 
-func (s Server) PausePlayback(w http.ResponseWriter, req *http.Request) {
+func (s *Server) PausePlayback(w http.ResponseWriter, req *http.Request) {
 	slog.Debug("Toggling pause")
 	err := s.VlcClient.PlayPause()
 	if err != nil {
@@ -78,7 +76,7 @@ func (s Server) PausePlayback(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s Server) TrackAhead(w http.ResponseWriter, req *http.Request) {
+func (s *Server) TrackAhead(w http.ResponseWriter, req *http.Request) {
 	slog.Debug("Skipping ahead in playlist")
 	err := s.VlcClient.TrackAhead()
 	if err != nil {
@@ -89,7 +87,7 @@ func (s Server) TrackAhead(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s Server) TrackBack(w http.ResponseWriter, req *http.Request) {
+func (s *Server) TrackBack(w http.ResponseWriter, req *http.Request) {
 	slog.Debug("Backtracking in playlist")
 	err := s.VlcClient.TrackBack()
 	if err != nil {
@@ -100,8 +98,8 @@ func (s Server) TrackBack(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s Server) ToggleShuffle(w http.ResponseWriter, req *http.Request) {
-	cfg := config.LoadConfig(s.Db)
+func (s *Server) ToggleShuffle(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig()
 	// Load the current state of the VLC player to determine what commands to send
 	vlcStatus, err := s.VlcClient.GetStatus()
 	if err != nil {
@@ -119,13 +117,13 @@ func (s Server) ToggleShuffle(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// save the setting change
-	config.SaveConfig(cfg, s.Db)
+	config.SaveConfig(cfg)
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s Server) ToggleLoop(w http.ResponseWriter, req *http.Request) {
-	cfg := config.LoadConfig(s.Db)
+func (s *Server) ToggleLoop(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig()
 	// Load the current state of the VLC player to determine what commands to send
 	vlcStatus, err := s.VlcClient.GetStatus()
 	if err != nil {
@@ -143,13 +141,13 @@ func (s Server) ToggleLoop(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// save the setting change
-	config.SaveConfig(cfg, s.Db)
+	config.SaveConfig(cfg)
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s Server) SelectPlaylist(w http.ResponseWriter, req *http.Request) {
-	cfg := config.LoadConfig(s.Db)
+func (s *Server) SelectPlaylist(w http.ResponseWriter, req *http.Request) {
+	cfg := config.LoadConfig()
 
 	var playlistRequest SelectPlaylistRequest
 	b, err := io.ReadAll(req.Body)
@@ -193,7 +191,7 @@ func (s Server) SelectPlaylist(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// save the setting change
-	config.SaveConfig(cfg, s.Db)
+	config.SaveConfig(cfg)
 
 	w.WriteHeader(http.StatusNoContent)
 }

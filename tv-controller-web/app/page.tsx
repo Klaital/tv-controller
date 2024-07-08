@@ -7,7 +7,7 @@ import {createClient} from "@hey-api/client-fetch";
 
 
 createClient({
-    baseUrl:'http://localhost:8080',
+    baseUrl:'http://192.168.88.178:8080',
 })
 
 export default function Home() {

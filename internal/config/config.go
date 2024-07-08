@@ -1,12 +1,11 @@
 package config
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mattn/go-sqlite3"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -49,33 +48,25 @@ func GetPlaylistPath(playlistName string) string {
 
 var singleton *Config
 
-func LoadConfig(db *sql.DB) *Config {
+func LoadConfig() *Config {
 	if singleton != nil {
 		return singleton
 	}
 	// lazy-init: create the empty config if none exists
 	var cfg *Config
-	err := db.QueryRow("SELECT data FROM config LIMIT 1").Scan(&cfg)
-	if err != nil {
-		var sqlite3Err sqlite3.Error
-		if errors.As(err, &sqlite3Err) {
-			slog.Debug("Sqlite3 error", "error", sqlite3Err, "code", sqlite3Err.Code)
-			_, err := db.Exec("CREATE TABLE config (data JSONB)")
-			if err != nil {
-				slog.Error("Failed to initialize config table", "error", err)
-				os.Exit(1)
-			} else {
-				slog.Info("Created config table")
-				_, err := db.Exec("INSERT INTO config (data) VALUES (?)", NewConfig())
-				if err != nil {
-					slog.Error("Failed to write default config settings", "error", err)
-				} else {
-					slog.Info("Initialized config db with default settings")
-				}
-				cfg = NewConfig()
-			}
-		} else {
-			slog.Error("Error querying config data", "error", err)
+	configBytes, err := os.ReadFile(filepath.Join(GetConfigDir(), "config.json"))
+	if errors.Is(err, fs.ErrNotExist) || len(configBytes) == 0 {
+		slog.Debug("Initializing default config")
+		cfg = NewConfig()
+		SaveConfig(cfg)
+	} else if err != nil {
+		slog.Error("Failed to load config.json", "error", err)
+		os.Exit(1)
+	} else {
+		cfg = NewConfig()
+		err = json.Unmarshal(configBytes, cfg)
+		if err != nil {
+			slog.Error("Failed to parse config.json", "error", err)
 			os.Exit(1)
 		}
 	}
@@ -95,13 +86,14 @@ func LoadConfig(db *sql.DB) *Config {
 	return cfg
 }
 
-func SaveConfig(cfg *Config, db *sql.DB) {
-	_, err := db.Exec("UPDATE config SET data=?", cfg)
+func SaveConfig(cfg *Config) {
+	configBytes, err := json.Marshal(cfg)
 	if err != nil {
-		slog.Error("Failed to write config update", "error", err)
-		os.Exit(1)
-	} else {
-		slog.Debug("Updated config settings")
+		slog.Error("Failed to marshal config.json", "error", err)
+	}
+	err = os.WriteFile(filepath.Join(GetConfigDir(), "config.json"), configBytes, fs.ModePerm)
+	if err != nil {
+		slog.Error("Failed to save config.json", "error", err)
 	}
 }
 
