@@ -6,6 +6,8 @@ import (
 	"github.com/klaital/tv-controller/cmd/server/api"
 	"github.com/klaital/tv-controller/internal/config"
 	"github.com/klaital/tv-controller/vlcclient"
+	"github.com/krynr/cec"
+	"github.com/krynr/cec/device/raspberrypi"
 	"github.com/rs/cors"
 	"log/slog"
 	"net/http"
@@ -32,6 +34,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize the CEC client to listen for power on/off signals from the TV
+	d := raspberrypi.Init(cec.TV, cec.DeviceTypeTV)
+	x, err := cec.New(d, cec.Config{OSDName: "RPI"})
+	if err != nil {
+		slog.Error("Failed to connect to CEC bus", "error", err)
+		os.Exit(1)
+	}
+	// Logger handler. Returning false causes the next handler to always trigger
+	x.AddHandleFunc(func(x *cec.Cec, msg cec.Message) bool {
+		slog.Debug("CEC message", "msg", msg)
+		return false
+	})
+	// Fallback default handler
+	x.AddHandler(cec.DefaultHandler{})
+	go x.Run()
+	
+	// Start the REST server
 	router := mux.NewRouter()
 	spa := spaHandler{
 		staticPath: "tv-controller-web/dist",
