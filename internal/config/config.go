@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -31,6 +32,15 @@ func NewConfig() *Config {
 		Loop:               false,
 		VlcPath:            "C:\\Program Files\\VideoLAN\\VLC\\vlc.exe", // this is correct for a windows dev machine using WSL
 	}
+}
+
+func (c *Config) ToString() string {
+	var s string
+	s += fmt.Sprintf("playlists_available=%s\n", strings.Join(c.PlaylistsAvailable, ","))
+	s += fmt.Sprintf("selected_playlist=%s\n", c.SelectedPlaylist)
+	s += fmt.Sprintf("shuffle=%t\n", c.Shuffle)
+	s += fmt.Sprintf("loop=%t\n", c.Loop)
+	return s
 }
 
 func GetConfigDir() string {

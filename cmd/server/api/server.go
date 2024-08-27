@@ -26,17 +26,26 @@ func pointerTo[T any](s T) *T {
 // GET /cfg
 func (s *Server) GetConfig(w http.ResponseWriter, req *http.Request) {
 	cfg := config.LoadConfig()
-	b, err := json.Marshal(cfg)
-	if err != nil {
-		slog.Error("Failed to serialize config data", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	_, err = w.Write(b)
-	if err != nil {
-		slog.Error("Failed to write config data", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	if req.Header.Get("Accept") == "application/text" {
+		_, err := w.Write([]byte(cfg.ToString()))
+		if err != nil {
+			slog.Error("Failed to write config data", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	} else {
+		b, err := json.Marshal(cfg)
+		if err != nil {
+			slog.Error("Failed to serialize config data", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			slog.Error("Failed to write config data", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
