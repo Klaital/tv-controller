@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/klaital/tv-controller/cmd/server/api"
+	mqtt_server "github.com/klaital/tv-controller/cmd/server/mqtt"
 	"github.com/klaital/tv-controller/internal/config"
 	"github.com/klaital/tv-controller/vlcclient"
 	"github.com/rs/cors"
@@ -32,6 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set up the HTTP Server
 	router := mux.NewRouter()
 	spa := spaHandler{
 		staticPath: "tv-controller-web/dist",
@@ -50,6 +52,15 @@ func main() {
 		Handler: c.Handler(h),
 		Addr:    "0.0.0.0:8080",
 	}
+
+	// Set up the MQTT Server
+	mServer := mqtt_server.MqttServer{
+		
+		Config: cfg,
+		Vlc:    vlcClient,
+	}
+
+	go mServer.Start()
 
 	slog.Info("Listening for HTTP requests", "Addr", s.Addr)
 	s.ListenAndServe()
