@@ -62,6 +62,7 @@ func (s *MqttServer) Start() {
 	slog.Info("Shutting down MQTT server")
 	s.shutdown = true
 	client.Disconnect(250)
+	os.Exit(0)
 }
 func (s *MqttServer) OnConnect(client mqtt.Client) {
 	opts := client.OptionsReader()
