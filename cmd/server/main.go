@@ -55,7 +55,12 @@ func main() {
 
 	// Set up the MQTT Server
 	mServer := mqtt_server.MqttServer{
-		
+		Host:                "klaital.com",
+		Port:                1883,
+		PublishConfigTopic:  "bedroom/tv/config",
+		RequestConfigTopic:  "bedroom/tv/update",
+		ChangePlaylistTopic: "bedroom/tv/playlist",
+
 		Config: cfg,
 		Vlc:    vlcClient,
 	}

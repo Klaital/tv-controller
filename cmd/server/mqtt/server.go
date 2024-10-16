@@ -20,9 +20,10 @@ type MqttServer struct {
 	RequestConfigTopic  string // used by others to prompt for a re-publication of the config settings
 	ChangePlaylistTopic string // used by others to request a new playlist be loaded
 
-	Config  *config.Config
-	Vlc     *vlcclient.Client
-	mClient mqtt.Client
+	Config   *config.Config
+	Vlc      *vlcclient.Client
+	mClient  mqtt.Client
+	shutdown bool
 }
 
 func (s *MqttServer) Start() {
@@ -36,19 +37,20 @@ func (s *MqttServer) Start() {
 		SetOnConnectHandler(s.OnConnect).
 		SetConnectionLostHandler(s.OnConnectionLost)
 	client := mqtt.NewClient(opts)
-	if token := client.Subscribe(s.ChangePlaylistTopic, 1, nil); token.Wait() && token.Error() != nil {
-		slog.Error("Failed to subscribe", "topic", s.ChangePlaylistTopic, "err", token.Error())
-	} else {
-		slog.Info("Subscribed to topic", "topic", s.ChangePlaylistTopic)
-	}
-
-	if token := client.Subscribe(s.RequestConfigTopic, 1, nil); token.Wait() && token.Error() != nil {
-		slog.Error("Failed to subscribe", "topic", s.RequestConfigTopic, "err", token.Error())
-	} else {
-		slog.Info("Subscribed to topic", "topic", s.RequestConfigTopic)
-	}
+	//if token := client.Subscribe(s.ChangePlaylistTopic, 1, nil); token.Wait() && token.Error() != nil {
+	//	slog.Error("Failed to subscribe", "topic", s.ChangePlaylistTopic, "err", token.Error())
+	//} else {
+	//	slog.Info("Subscribed to topic", "topic", s.ChangePlaylistTopic)
+	//}
+	//
+	//if token := client.Subscribe(s.RequestConfigTopic, 1, nil); token.Wait() && token.Error() != nil {
+	//	slog.Error("Failed to subscribe", "topic", s.RequestConfigTopic, "err", token.Error())
+	//} else {
+	//	slog.Info("Subscribed to topic", "topic", s.RequestConfigTopic)
+	//}
 
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		slog.Error("Failed to connect to mqtt server", "err", token.Error())
 		panic(token.Error())
 	}
 	s.mClient = client
@@ -57,6 +59,8 @@ func (s *MqttServer) Start() {
 	exit := make(chan os.Signal)
 	signal.Notify(exit, syscall.SIGINT, syscall.SIGTERM)
 	<-exit
+	slog.Info("Shutting down MQTT server")
+	s.shutdown = true
 	client.Disconnect(250)
 }
 func (s *MqttServer) OnConnect(client mqtt.Client) {
@@ -78,13 +82,16 @@ func (s *MqttServer) OnConnect(client mqtt.Client) {
 }
 func (s *MqttServer) OnConnectionLost(client mqtt.Client, err error) {
 	slog.Error("MQTT Connection lost", "err", err)
-	go func() {
-		time.Sleep(5 * time.Second)
-		token := client.Connect()
-		if err := token.Error(); err != nil {
-			slog.Error("Failed to reconnect to MQTT broker", "err", err)
-		}
-	}()
+	// Automatically reconnect unless the disconnect was on purpose.
+	if !s.shutdown {
+		go func() {
+			time.Sleep(5 * time.Second)
+			token := client.Connect()
+			if err := token.Error(); err != nil {
+				slog.Error("Failed to reconnect to MQTT broker", "err", err)
+			}
+		}()
+	}
 }
 
 func (s *MqttServer) Handler(client mqtt.Client, msg mqtt.Message) {
