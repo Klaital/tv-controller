@@ -68,5 +68,8 @@ func main() {
 	go mServer.Start()
 
 	slog.Info("Listening for HTTP requests", "Addr", s.Addr)
-	s.ListenAndServe()
+	if err = s.ListenAndServe(); err != nil {
+		slog.Error("Failed to start HTTP server", "error", err)
+		os.Exit(1)
+	}
 }
